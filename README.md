@@ -2,6 +2,9 @@
 
 A zsh widget to fuzzy find npm run commands within a monorepo 
 
+## Requirements 
+Make sure you have rust installed and also [fzf](https://github.com/junegunn/fzf)
+
 ## Getting setup 
 Build the cargo package 
 ```
