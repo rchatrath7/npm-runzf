@@ -1,0 +1,44 @@
+#compdef npm
+
+_npm_run_completion() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    # Only handle 'npm run' commands
+    if [[ ${words[2]} != "run" ]]; then
+        return
+    }
+
+    # Extract workspace if specified with -w flag
+    local workspace=""
+    if [[ ${words[@]} =~ "-w ([^ ]+)" ]]; then
+        workspace="${match[1]}"
+    fi
+
+    # Get completions from Rust tool
+    local completions
+    if [[ -n "$workspace" ]]; then
+        completions=$(npm-runzf --workspace "$workspace")
+    else
+        completions=$(npm-runzf)
+    fi
+
+    # Use fzf for selection
+    local selected=$(echo "$completions" | fzf --height 40% --reverse)
+
+    if [[ -n "$selected" ]]; then
+        local cmd="${selected%%	*}"
+        local ws="${selected##*	}"
+
+        if [[ "$ws" != "$cmd" ]]; then
+            LBUFFER="npm run -w $ws $cmd"
+        else
+            LBUFFER="npm run $cmd"
+        fi
+        CURSOR=$#LBUFFER
+    fi
+
+    zle -R -c  # Refresh the display
+}
+
+compdef _npm_run_completion npm
