@@ -10,7 +10,7 @@ cargo build --release
 
 Add it to your path via `cp` or symlink
 ```
-ln -sf "$(pwd)/npm-runzf/target/release/npm-runzf ~/.local/bin/  # or somewhere in your PATH
+ln -sf "$(pwd)/target/release/npm-runzf ~/.local/bin/  # or somewhere in your PATH
 ```
 
 Add the zsh script
