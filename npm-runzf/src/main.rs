@@ -1,5 +1,5 @@
 use glob::glob;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -46,62 +46,49 @@ fn get_workspace_patterns(root: &Path) -> Vec<String> {
 fn find_package_jsons(root: &Path) -> Vec<PathBuf> {
     let mut package_jsons = vec![];
 
+    // Always include root package.json if it exists
     let root_package = root.join("package.json");
     if root_package.exists() {
         package_jsons.push(root_package);
     }
 
+    // Get workspace patterns from root package.json
     let patterns = get_workspace_patterns(root);
 
-    //  for pattern in patterns {
-    //     let glob_pattern = root.join(pattern).join("package.json");
-    //     if let Ok(pattern_str) = glob_pattern.to_str() {
-    //         if let Ok(matches) = glob(pattern_str) {
-    //             for entry in matches.filter_map(Result::ok) {
-    //                 package_jsons.push(entry);
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // println!("{:?}", patterns);
-
     for pattern in patterns {
-        let glob_pattern = root.join(pattern).join("package.json");
-        let pattern_str = glob_pattern.to_str().unwrap();
-        let matches = glob(pattern_str).unwrap();
-        for entry in matches.filter_map(Result::ok) {
-            package_jsons.push(entry);
+        let glob_pattern = root.join(&pattern).join("package.json");
+        if let Some(pattern_str) = glob_pattern.to_str() {
+            if let Ok(matches) = glob(pattern_str) {
+                for entry in matches.filter_map(Result::ok) {
+                    package_jsons.push(entry);
+                }
+            }
         }
     }
 
     package_jsons
 }
 
-fn extract_scripts(obj: &Map<String, Value>) -> Vec<String> {
-    match obj.get("scripts") {
-        Some(scripts) => scripts
-            .as_object()
-            .map(|scripts| scripts.keys().map(|k| k.to_string()).collect())
-            .unwrap(),
-        None => return vec![],
-    }
-}
-
 fn process_package_json(path: &Path) -> Result<Vec<Command>, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
     let json: Value = serde_json::from_str(&content)?;
 
-    let scripts = match json.as_object() {
-        Some(obj) => extract_scripts(obj),
-        None => return Ok(vec![]),
+    let scripts = match &json["scripts"] {
+        Value::Object(scripts) => scripts.keys().cloned().collect(),
+        _ => vec![],
     };
 
     let workspace = path.parent().and_then(|p| {
-        if p == Path::new(".") {
+        let root = find_root_dir().unwrap_or_else(|| PathBuf::from("."));
+        if p == root {
             None
         } else {
-            Some(p.to_string_lossy().into_owned())
+            Some(
+                p.strip_prefix(&root)
+                    .unwrap_or(p)
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         }
     });
 
@@ -115,16 +102,6 @@ fn process_package_json(path: &Path) -> Result<Vec<Command>, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = std::env::args().collect();
-    let mut workspace_filter = None;
-
-    for i in 0..args.len() {
-        if args[i] == "--workspace" && i + 1 < args.len() {
-            workspace_filter = Some(args[i + 1].clone());
-            break;
-        }
-    }
-
     let root = find_root_dir().ok_or("Could not find root package.json")?;
     let package_jsons = find_package_jsons(&root);
 
@@ -135,28 +112,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let filtered_commands: Vec<&Command> = match &workspace_filter {
-        Some(ws) => all_commands
-            .iter()
-            .filter(|cmd| cmd.workspace.as_ref().map_or(false, |w| w.contains(ws)))
-            .collect(),
-        None => all_commands.iter().collect(),
-    };
+    // const SEAFOAM: &str = "\x1b[38;2;156;207;216m"; // #9CCFD8
+    // const DARK_BLUE: &str = "\x1b[38;2;160;120;192m"; // #A078C0
+    // const RESET: &str = "\x1b[38;2;235;111;146m"; // #EB6F92 (Rose Pine love/pink)
 
-    for cmd in filtered_commands {
-        match &cmd.workspace {
-            Some(ws) => {
-                let stripped = Path::new(ws)
-                    .strip_prefix(root.to_str().unwrap())
-                    .unwrap()
-                    .to_str()
-                    .unwrap();
-                if stripped.is_empty() {
-                    println!("{}", cmd.name)
-                } else {
-                    println!("{} -w {}", cmd.name, stripped)
-                }
-            }
+    // Format for display: add descriptions and color formatting
+    // for cmd in all_commands {
+    //     match cmd.workspace {
+    //         Some(ws) => println!(
+    //             "{SEAFOAM}{}{DARK_BLUE}\t{DARK_BLUE}{}{DARK_BLUE}",
+    //             cmd.name, ws
+    //         ),
+    //         None => println!("{SEAFOAM}{}{DARK_BLUE}", cmd.name),
+    //     }
+    // }
+    for cmd in all_commands {
+        match cmd.workspace {
+            Some(ws) => println!("{}\t{}", cmd.name, ws),
             None => println!("{}", cmd.name),
         }
     }
