@@ -63,6 +63,8 @@ fn find_package_jsons(root: &Path) -> Vec<PathBuf> {
     //         }
     //     }
     // }
+    //
+    // println!("{:?}", patterns);
 
     for pattern in patterns {
         let glob_pattern = root.join(pattern).join("package.json");
@@ -77,10 +79,13 @@ fn find_package_jsons(root: &Path) -> Vec<PathBuf> {
 }
 
 fn extract_scripts(obj: &Map<String, Value>) -> Vec<String> {
-    obj.get("scripts")
-        .and_then(|s| s.as_object())
-        .map(|scripts| scripts.keys().map(|k| k.to_string()).collect())
-        .unwrap()
+    match obj.get("scripts") {
+        Some(scripts) => scripts
+            .as_object()
+            .map(|scripts| scripts.keys().map(|k| k.to_string()).collect())
+            .unwrap(),
+        None => return vec![],
+    }
 }
 
 fn process_package_json(path: &Path) -> Result<Vec<Command>, Box<dyn Error>> {
@@ -140,7 +145,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for cmd in filtered_commands {
         match &cmd.workspace {
-            Some(ws) => println!("{}\t{}", cmd.name, ws),
+            Some(ws) => println!(
+                "{} -w {}",
+                cmd.name,
+                Path::new(ws)
+                    .strip_prefix(root.to_str().unwrap())
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+            ),
             None => println!("{}", cmd.name),
         }
     }
