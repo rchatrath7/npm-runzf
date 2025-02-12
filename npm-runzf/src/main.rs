@@ -145,15 +145,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for cmd in filtered_commands {
         match &cmd.workspace {
-            Some(ws) => println!(
-                "{} -w {}",
-                cmd.name,
-                Path::new(ws)
+            Some(ws) => {
+                let stripped = Path::new(ws)
                     .strip_prefix(root.to_str().unwrap())
                     .unwrap()
                     .to_str()
-                    .unwrap()
-            ),
+                    .unwrap();
+                if stripped.is_empty() {
+                    println!("{}", cmd.name)
+                } else {
+                    println!("{} -w {}", cmd.name, stripped)
+                }
+            }
             None => println!("{}", cmd.name),
         }
     }
